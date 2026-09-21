@@ -1,0 +1,31 @@
+# Build output
+/engine/build/
+build/
+*.o
+*.obj
+
+# Downloaded ML models (fetched via scripts/download_models.sh — see docs/LICENSES.md)
+/engine/models/*.onnx
+
+# Local biometric data — MUST NEVER be committed (names, embeddings, photos)
+/data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / React UI
+node_modules/
+/ui/dist/
+/ui/.vite/
+
+# Env / secrets
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
