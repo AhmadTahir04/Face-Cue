@@ -2,8 +2,18 @@
 #include <opencv2/imgproc.hpp>
 #include <algorithm>
 #include <map>
+#include <cmath>
 
 namespace ffa {
+
+double cosineSim(const cv::Mat& a, const cv::Mat& b) {
+    // dot(a,b) / (||a|| * ||b||) — same as SFace match(FR_COSINE).
+    double dot = a.dot(b);
+    double na  = std::sqrt(a.dot(a));
+    double nb  = std::sqrt(b.dot(b));
+    if (na == 0.0 || nb == 0.0) return 0.0;
+    return dot / (na * nb);
+}
 
 bool passesQualityGate(const cv::Mat& frameBGR, const DetectedFace& face,
                        const Config& cfg, std::string& reason) {
@@ -41,7 +51,6 @@ bool passesQualityGate(const cv::Mat& frameBGR, const DetectedFace& face,
 MatchResult classify(const cv::Mat& queryEmbedding,
                      const std::vector<StoredEmbedding>& enrolled,
                      const std::vector<Person>& people,
-                     Recognizer& rec,
                      const Config& cfg) {
     MatchResult r;
     if (enrolled.empty()) {
@@ -52,7 +61,7 @@ MatchResult classify(const cv::Mat& queryEmbedding,
     // Best cosine score per person (a person may have several embeddings).
     std::map<int64_t, double> bestPerPerson;
     for (const auto& e : enrolled) {
-        double s = rec.cosine(queryEmbedding, e.vec);
+        double s = cosineSim(queryEmbedding, e.vec);
         auto it = bestPerPerson.find(e.personId);
         if (it == bestPerPerson.end() || s > it->second)
             bestPerPerson[e.personId] = s;

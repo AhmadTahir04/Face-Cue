@@ -25,6 +25,11 @@ struct MatchResult {
     double      runnerUp    = 0.0;  // cosine to 2nd-best person
 };
 
+// Cosine similarity between two embeddings (pure math — no model needed).
+// This is identical to what SFace's match(FR_COSINE) computes, but keeping it
+// as a free function makes the decision logic unit-testable without the model.
+double cosineSim(const cv::Mat& a, const cv::Mat& b);
+
 // Quality gate: is this crop good enough to even attempt a match?
 // Returns true if usable. Reason (for logging) written to `reason`.
 bool passesQualityGate(const cv::Mat& frameBGR, const DetectedFace& face,
@@ -32,10 +37,10 @@ bool passesQualityGate(const cv::Mat& frameBGR, const DetectedFace& face,
 
 // Compare one query embedding against all enrolled embeddings and apply the
 // threshold + margin rules. Does NOT apply multi-frame logic (see FrameVoter).
+// Pure w.r.t. the ML model — only vector math — so it is easy to unit-test.
 MatchResult classify(const cv::Mat& queryEmbedding,
                      const std::vector<StoredEmbedding>& enrolled,
                      const std::vector<Person>& people,
-                     Recognizer& rec,
                      const Config& cfg);
 
 // Requires the same person to win N consecutive frames before we trust it.

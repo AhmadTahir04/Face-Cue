@@ -10,10 +10,12 @@
 // This is a local-only prototype. See docs/PRIVACY.md and docs/ARCHITECTURE.md.
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <filesystem>
 
 #include "ffa/config.hpp"
 #include "ffa/camera.hpp"
@@ -21,6 +23,7 @@
 #include "ffa/storage.hpp"
 #include "ffa/safety.hpp"
 #include "ffa/announcer.hpp"
+#include "ffa/pipeline.hpp"
 
 using namespace ffa;
 
@@ -30,11 +33,85 @@ void usage() {
     std::cout <<
         "Familiar Face Assistant (local-only prototype)\n"
         "Usage:\n"
-        "  ffa enroll \"Name\" [--reminder \"cousin\"] [--shots N]\n"
+        "  ffa enroll \"Name\" [--reminder \"cousin\"] [--shots N]   webcam enroll\n"
+        "  ffa enroll-dir \"Name\" <folder> [--reminder \"cousin\"]  enroll from images\n"
+        "  ffa identify <image>                                 classify one image\n"
         "  ffa list\n"
         "  ffa delete \"Name\"\n"
         "  ffa delete --all\n"
-        "  ffa watch\n";
+        "  ffa watch                                            live recognition\n";
+}
+
+namespace fs = std::filesystem;
+
+// defined further down; declared here so the offline commands can use it.
+std::string getFlag(const std::vector<std::string>& args, const std::string& flag,
+                    const std::string& def);
+
+bool isImage(const fs::path& p) {
+    std::string e = p.extension().string();
+    std::transform(e.begin(), e.end(), e.begin(), ::tolower);
+    return e == ".jpg" || e == ".jpeg" || e == ".png" || e == ".bmp" || e == ".webp";
+}
+
+// Offline enrollment from a folder of images — usable and testable without a
+// live camera. Enrolls the largest quality face found in each image.
+int cmdEnrollDir(const Config& cfg, const std::vector<std::string>& args) {
+    if (args.size() < 2) { std::cerr << "enroll-dir needs a name and a folder\n"; return 1; }
+    std::string name     = args[0];
+    std::string folder   = args[1];
+    std::string reminder = getFlag(args, "--reminder", "");
+    if (!fs::is_directory(folder)) { std::cerr << "Not a folder: " << folder << "\n"; return 1; }
+
+    Recognizer rec(cfg);
+    Storage    store(cfg.dbPath);
+    int64_t    pid = store.upsertPerson(name, reminder);
+
+    int added = 0, skipped = 0;
+    for (const auto& entry : fs::directory_iterator(folder)) {
+        if (!entry.is_regular_file() || !isImage(entry.path())) continue;
+        cv::Mat img = cv::imread(entry.path().string());
+        std::string reason;
+        cv::Mat emb = bestFaceEmbedding(img, rec, cfg, reason);
+        if (emb.empty()) { ++skipped; std::cout << "  skip " << entry.path().filename().string()
+                                                << " (" << reason << ")\n"; continue; }
+        store.addEmbedding(pid, emb);
+        ++added;
+    }
+    std::cout << "Enrolled \"" << name << "\": " << added << " embeddings ("
+              << skipped << " skipped).\n";
+    return added > 0 ? 0 : 1;
+}
+
+// Classify a single image against the enrolled set (offline; handy for testing).
+int cmdIdentify(const Config& cfg, const std::vector<std::string>& args) {
+    if (args.empty()) { std::cerr << "identify needs an image path\n"; return 1; }
+    Recognizer rec(cfg);
+    Storage    store(cfg.dbPath);
+    auto people = store.listPeople();
+    auto embs   = store.allEmbeddings();
+
+    cv::Mat img = cv::imread(args[0]);
+    std::string reason;
+    cv::Mat q = bestFaceEmbedding(img, rec, cfg, reason);
+    if (q.empty()) { std::cout << "no usable face (" << reason << ")\n"; return 1; }
+
+    MatchResult r = classify(q, embs, people, cfg);
+    switch (r.decision) {
+        case Decision::Match:
+            std::cout << "Possible match: " << r.name
+                      << (r.reminder.empty() ? "" : " (" + r.reminder + ")")
+                      << "  [score=" << r.score << ", runner-up=" << r.runnerUp << "]\n";
+            break;
+        case Decision::Unsure:
+            std::cout << "unsure (ambiguous)  [score=" << r.score
+                      << ", runner-up=" << r.runnerUp << "]\n"; break;
+        case Decision::Unknown:
+            std::cout << "unknown  [best score=" << r.score << "]\n"; break;
+        default:
+            std::cout << "low quality\n"; break;
+    }
+    return 0;
 }
 
 // Pick the largest detected face (the person the user is facing).
@@ -169,7 +246,7 @@ int cmdWatch(const Config& cfg) {
             std::string reason;
             if (passesQualityGate(frame, faces[fi], cfg, reason)) {
                 cv::Mat q = rec.embed(frame, faces[fi]);
-                MatchResult r = classify(q, embs, people, rec, cfg);
+                MatchResult r = classify(q, embs, people, cfg);
                 switch (r.decision) {
                     case Decision::Match:
                         label = r.name + (r.reminder.empty() ? "" : " (" + r.reminder + ")");
@@ -212,8 +289,10 @@ int main(int argc, char** argv) {
     std::string cmd = args[0];
     std::vector<std::string> rest(args.begin() + 1, args.end());
     try {
-        if (cmd == "enroll") return cmdEnroll(cfg, rest);
-        if (cmd == "list")   return cmdList(cfg);
+        if (cmd == "enroll")     return cmdEnroll(cfg, rest);
+        if (cmd == "enroll-dir") return cmdEnrollDir(cfg, rest);
+        if (cmd == "identify")   return cmdIdentify(cfg, rest);
+        if (cmd == "list")       return cmdList(cfg);
         if (cmd == "delete") return cmdDelete(cfg, rest);
         if (cmd == "watch")  return cmdWatch(cfg);
         usage();

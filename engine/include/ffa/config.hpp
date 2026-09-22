@@ -8,8 +8,9 @@ namespace ffa {
 // Evaluation milestone. A cosine score is NOT a calibrated probability.
 struct Config {
     // --- model files (downloaded by scripts/download_models.sh) ---
-    std::string detectorModel   = "models/face_detection_yunet_2023mar.onnx";
-    std::string recognizerModel = "models/face_recognition_sface_2021dec.onnx";
+    // Paths are relative to engine/build (where the binaries run).
+    std::string detectorModel   = "../models/face_detection_yunet_2023mar.onnx";
+    std::string recognizerModel = "../models/face_recognition_sface_2021dec.onnx";
 
     // --- storage ---
     std::string dbPath = "../../data/faces.db";  // repo-root/data, from engine/build
@@ -24,10 +25,12 @@ struct Config {
     double minBlurVar  = 40.0;   // reject crops with Laplacian variance below this (blurry)
 
     // --- matching (SFace cosine similarity) ---
-    // OpenCV's suggested SFace cosine threshold is ~0.363. We start a touch
-    // higher to bias toward silence over wrong names.
-    float cosThreshold = 0.38f;  // face must be at least this similar to an enrolled person
-    float margin       = 0.06f;  // best person must beat 2nd-best person by this much
+    // Tuned on LFW (see docs/EVALUATION.md): 0.54/0.10 gave 0 false matches over
+    // 1642 stranger tests and 0 wrong names, at the cost of ~0.5% misses.
+    // OpenCV's default 0.363 gave 42 false matches on the same set — far too
+    // risky for this product. Re-tune on your own enrolled group for real use.
+    float cosThreshold = 0.54f;  // face must be at least this similar to an enrolled person
+    float margin       = 0.10f;  // best person must beat 2nd-best person by this much
 
     // --- multi-frame agreement ---
     int framesNeeded = 5;        // consecutive agreeing frames before announcing

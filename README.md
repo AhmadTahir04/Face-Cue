@@ -9,11 +9,18 @@ people with prosopagnosia (face blindness).
 > it is designed to stay silent rather than guess a wrong name.
 > See [docs/PRIVACY.md](docs/PRIVACY.md).
 
-## Status: Milestone 1 (command-line prototype)
+## Status: Milestones 1–3 complete (engine done, tuned, tested)
 
-A C++ command-line tool that enrolls a person from the webcam and, in a live
-"watch" mode, announces an enrolled person or says nothing for an unknown face.
-The polished React UI and localhost API come in later milestones.
+A C++ command-line tool that enrolls a person (webcam or image folder) and, in a
+live "watch" mode, announces an enrolled person or stays silent for an unknown
+face. The safety logic is unit-tested and the thresholds are tuned on a public
+benchmark (0 false matches over 1642 stranger tests — see
+[docs/EVALUATION.md](docs/EVALUATION.md)). The polished React UI and localhost
+API come next (Milestone 4).
+
+> One manual step remains for the maintainer: run `enroll`/`watch` once on the
+> Mac to grant camera access and confirm live recognition (the automated tests
+> and evaluation cover everything that can run without a physical camera).
 
 ## Architecture (short version)
 
@@ -55,16 +62,47 @@ cd build
 ## Usage
 
 ```bash
-./ffa enroll "Sarah" --reminder "cousin"   # capture 5 shots (press SPACE)
-./ffa list                                 # show enrolled people
-./ffa watch                                # live, hands-free recognition
-./ffa delete "Sarah"                       # delete one person
-./ffa delete --all                         # wipe all enrolled data
+# Enrollment
+./ffa enroll "Sarah" --reminder "cousin"     # webcam: press SPACE to capture 5 shots
+./ffa enroll-dir "Sarah" ./photos/sarah      # offline: enroll from a folder of images
+
+# Recognition
+./ffa watch                                  # live, hands-free recognition
+./ffa identify ./some_photo.jpg              # offline: classify one image
+
+# Manage
+./ffa list                                   # show enrolled people
+./ffa delete "Sarah"                         # delete one person
+./ffa delete --all                           # wipe all enrolled data
 ```
 
 In `watch` mode it announces an enrolled person **once** (spoken via macOS
 `say`, plus on-screen), then stays quiet during a cooldown; unknown faces get
 **no** announcement.
+
+## Tests
+
+The safety-critical decision logic (cosine, threshold, margin, multi-frame
+voter, quality gate) has unit tests that run **without** the ML model:
+
+```bash
+cd engine/build && ctest --output-on-failure    # or ./ffa_tests
+```
+
+## Evaluation & tuning
+
+`ffa_eval` runs the real pipeline over a labeled image dataset (one subfolder
+per person), sweeps the threshold/margin, and reports the metrics that matter —
+correct matches, **wrong-name matches**, misses, **false matches for
+strangers**, and per-face latency.
+
+```bash
+./ffa_eval /path/to/dataset --report ../../docs/EVALUATION.md
+```
+
+The current defaults in `config.hpp` were tuned this way; see
+[docs/EVALUATION.md](docs/EVALUATION.md). Numbers on a public benchmark are a
+sanity check — tuning on your own enrolled group is still recommended.
 
 ## Tuning & honesty
 

@@ -21,21 +21,36 @@ endif()
 find_package(OpenCV REQUIRED)
 find_package(SQLite3 REQUIRED)
 
-add_executable(ffa
-    src/main.cpp
+# --- shared engine library ---
+add_library(ffacore STATIC
     src/camera.cpp
     src/recognizer.cpp
     src/storage.cpp
     src/safety.cpp
     src/announcer.cpp
+    src/pipeline.cpp
 )
-
-target_include_directories(ffa PRIVATE
+target_include_directories(ffacore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${OpenCV_INCLUDE_DIRS}
 )
+target_link_libraries(ffacore PUBLIC ${OpenCV_LIBS} SQLite3::SQLite3)
 
-target_link_libraries(ffa PRIVATE
-    ${OpenCV_LIBS}
-    SQLite3::SQLite3
-)
+# --- main app (CLI prototype) ---
+add_executable(ffa src/main.cpp)
+target_link_libraries(ffa PRIVATE ffacore)
+
+# --- evaluation / threshold-tuning tool ---
+add_executable(ffa_eval src/eval.cpp)
+target_link_libraries(ffa_eval PRIVATE ffacore)
+
+# --- unit tests (safety logic; no ML model needed) ---
+enable_testing()
+find_package(GTest)
+if(GTest_FOUND)
+    add_executable(ffa_tests tests/test_safety.cpp)
+    target_link_libraries(ffa_tests PRIVATE ffacore GTest::gtest GTest::gtest_main)
+    add_test(NAME ffa_tests COMMAND ffa_tests)
+else()
+    message(STATUS "GTest not found — skipping unit tests. `brew install googletest`")
+endif()
