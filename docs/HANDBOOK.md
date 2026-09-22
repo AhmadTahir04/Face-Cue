@@ -5,8 +5,9 @@
 > "what every file does" and "how to explain it in an interview."
 >
 > **Maintenance:** this file is kept up to date as the project grows. Last
-> updated for: **Milestones 1–3 complete** (engine built, tuned, tested; UI not
-> started yet).
+> updated for: **Milestone 4 in progress** — the web UI (C++ HTTP server +
+> React/TypeScript front-end) is built on top of the tuned, tested engine from
+> Milestones 1–3.
 
 ---
 
@@ -73,7 +74,19 @@ Plain-English definitions of everything used in this project.
 | **Inference** | Running a trained model on new data to get a result (vs. *training*, which creates the model). |
 | **Enrollment** | Adding a person: taking their photos, making embeddings, and saving them. This is how the app "learns" someone — see §9. |
 | **TTS** | Text-to-speech (the spoken "Possible match: Sarah"). We use macOS's built-in `say`. |
-| **Localhost / 127.0.0.1** | Your own computer talking to itself. The future UI will use this so nothing goes over the network. |
+| **Localhost / 127.0.0.1** | Your own computer talking to itself. The web UI uses this so nothing goes over the network. |
+| **HTTP server / API** | A program that answers requests (like a mini website). Ours (`ffa_server`) lets the UI ask things like "who's enrolled?" or "start watching." |
+| **REST / endpoint** | A style of API where each URL (an "endpoint," e.g. `/api/people`) does one thing. |
+| **JSON** | A simple text format for data (`{"name":"Sarah"}`). The UI and server talk in JSON. |
+| **cpp-httplib** | The C++ library that turns our engine into an HTTP server. Header-only (just one file to include). |
+| **nlohmann/json** | The C++ library for reading/writing JSON. |
+| **MJPEG** | "Motion JPEG" — a way to stream video as a rapid series of JPEG images. The server streams the camera preview to the browser this way. |
+| **React** | A popular JavaScript/TypeScript library for building user interfaces out of reusable "components." |
+| **TypeScript** | JavaScript with type-checking (catches mistakes before running). The whole UI is TypeScript. |
+| **Vite** | The build tool that compiles/bundles the React app and runs a fast dev server. |
+| **Component** | A reusable piece of UI in React (e.g. `EnrollPanel`) — its own file, own logic. |
+| **thread / mutex** | A *thread* lets code run at the same time as other code (the camera loop runs in its own thread). A *mutex* is a lock that stops two threads from touching the same data at once. |
+| **Web Speech API** | A browser feature that speaks text aloud. The UI uses it for the spoken "Possible match." |
 
 ---
 
@@ -111,6 +124,30 @@ networks we just run). Steps 2, 4, 5, 6 are **plain, readable logic that we
 control** — that's where the "don't say a wrong name" safety lives. The
 safety-critical decision is *not* a black box.
 
+### How the web app is wired (Milestone 4)
+
+The engine now also runs as a local server, with a browser UI on top. Nothing
+leaves the machine — it's your computer talking to itself on `127.0.0.1`:
+
+```
+  Browser (React + TypeScript UI)
+     │  asks JSON questions:  /api/people, /api/watch/start, /api/enroll/capture ...
+     │  shows live video:     <img src="/stream.mjpg">
+     │  speaks the name:      Web Speech API (in the browser)
+     ▼
+  ffa_server (C++, cpp-httplib)  ── 127.0.0.1 only ──┐
+     │                                               │
+     │  one background thread owns the camera +      │
+     │  runs the recognition pipeline (§3 above)     │
+     ▼                                               │
+  ffacore (the same engine library from M1–3) ───────┘
+```
+
+- The **server** owns the camera and does all recognition (the private part).
+- The **browser** only shows things and plays audio (the presentation part).
+- This split is exactly why a future phone/wearable client is possible: it would
+  talk to the same API.
+
 ---
 
 ## 4. Repository layout
@@ -143,13 +180,30 @@ Smart-Glasses/
 │   │   ├── storage.cpp       ← the database
 │   │   ├── announcer.cpp
 │   │   ├── pipeline.cpp      ← shared "image → best face embedding" helper
-│   │   └── eval.cpp          ← the accuracy/tuning tool
+│   │   ├── eval.cpp          ← the accuracy/tuning tool (ffa_eval)
+│   │   └── server.cpp        ← the local HTTP server + MJPEG preview (ffa_server)
 │   ├── tests/
 │   │   └── test_safety.cpp   ← 15 unit tests for the decision logic
 │   ├── models/               ← the .onnx model files (downloaded, not in git)
 │   └── build/                ← compiled output (created by CMake, not in git)
+├── ui/                       ← the React + TypeScript web front-end
+│   ├── package.json          ← UI dependencies + scripts
+│   ├── vite.config.ts        ← build config + dev proxy to the C++ server
+│   ├── index.html            ← the page shell
+│   ├── src/
+│   │   ├── main.tsx          ← React entry point
+│   │   ├── App.tsx           ← top-level UI: polls status, layout, speech
+│   │   ├── api.ts            ← typed client for the server's API
+│   │   ├── styles.css        ← all styling
+│   │   └── components/
+│   │       ├── Preview.tsx      ← live camera preview (<img> MJPEG)
+│   │       ├── WatchPanel.tsx   ← start/stop watching + result card
+│   │       ├── EnrollPanel.tsx  ← enrollment flow
+│   │       └── PeoplePanel.tsx  ← review & delete enrolled people
+│   └── dist/                 ← built UI (created by `npm run build`, not in git)
 ├── scripts/
-│   └── download_models.sh    ← downloads YuNet + SFace models
+│   ├── download_models.sh    ← downloads YuNet + SFace models
+│   └── run.sh                ← build everything + start the web app
 └── data/                     ← the local database lives here (not in git)
     └── faces.db              ← SQLite: names + embeddings
 ```
@@ -232,6 +286,32 @@ Defines the command-line commands and wires the modules together:
 A separate program (`ffa_eval`) that runs the real pipeline over a labeled image
 dataset, sweeps threshold/margin combinations, and reports accuracy metrics. This
 is how we found `0.54 / 0.10`. See §11.
+
+### `engine/src/server.cpp` — the local web server ⭐ (the UI backend)
+A separate program (`ffa_server`) that puts the engine behind a small HTTP API on
+`127.0.0.1` so the browser UI can drive it. Key ideas:
+- **One background thread owns the camera and the Recognizer** (the models aren't
+  thread-safe). It continuously reads frames, runs enroll/watch logic, and keeps
+  the latest annotated JPEG ready.
+- **HTTP handlers** (list people, start/stop watch, capture, delete…) talk to
+  that thread through shared variables protected by a **mutex**. All database
+  access goes through one `dbMutex` so it's safe.
+- **`/stream.mjpg`** streams the annotated preview as MJPEG to an `<img>` tag.
+- It serves the built React app from `ui/dist`.
+- It does **not** speak — it exposes an "announcement event," and the browser
+  does the talking (Web Speech). Bound to localhost only.
+
+### The `ui/` folder — the React + TypeScript front-end
+- `src/api.ts` — one typed function per server endpoint (the only place that
+  knows the API shape).
+- `src/App.tsx` — polls `/api/status` twice a second, holds the people list, and
+  triggers browser speech when a new announcement arrives.
+- `src/components/Preview.tsx` — shows the MJPEG stream.
+- `src/components/WatchPanel.tsx` — Start/Stop watching + the result card
+  ("Possible match" / "Not sure" / "Unknown").
+- `src/components/EnrollPanel.tsx` — enter a name, then capture shots.
+- `src/components/PeoplePanel.tsx` — list + delete enrolled people.
+- `vite.config.ts` — in dev, proxies `/api` and `/stream.mjpg` to the C++ server.
 
 ### `engine/tests/test_safety.cpp` — the proof
 15 GoogleTest unit tests for `cosineSim`, `classify`, `FrameVoter`, and
@@ -396,7 +476,20 @@ brew install cmake pkg-config opencv sqlite googletest nlohmann-json cpp-httplib
 ```bash
 cd engine
 cmake -S . -B build          # configure (once, or after editing CMakeLists)
-cmake --build build          # compile → creates build/ffa, ffa_eval, ffa_tests
+cmake --build build          # compile → build/ffa, ffa_eval, ffa_tests, ffa_server
+```
+
+**Run the web app (easiest — builds everything and starts the server):**
+```bash
+./scripts/run.sh             # then open http://127.0.0.1:8765
+```
+This builds the C++ server, builds the React UI (first time), and starts
+`ffa_server`. Open the URL in a browser to enroll, watch, and manage people.
+
+**Front-end development (hot reload):**
+```bash
+cd engine/build && ./ffa_server        # terminal 1: the API + camera
+cd ui && npm run dev                    # terminal 2: Vite dev server (proxies /api)
 ```
 
 **Run the app** (from `engine/build`):
@@ -485,8 +578,10 @@ method + honest limitations in [EVALUATION.md](EVALUATION.md).
 - ✅ **M2** Recognition engine (offline-verified; live camera is a manual check)
 - ✅ **M3** Safety behavior — tested + tuned
 - ✅ **M5** Evaluation — pulled forward, real metrics exist
-- ⬜ **M4** Usable UI — local API (cpp-httplib, 127.0.0.1) + React + TypeScript:
-  live preview, enrollment, results, mute, camera indicator, manage/delete
+- 🟡 **M4** Usable UI — **built**: local API (cpp-httplib, 127.0.0.1) + React +
+  TypeScript with live preview, enrollment, watch + result card, mute, camera
+  indicator, manage/delete. Remaining: run it live on the Mac (camera permission)
+  and polish.
 - ⬜ **M6** Polish — onboarding, accessibility, docs, recorded demo
 - ⬜ **Optional** Wearable (phone-as-camera over local Wi-Fi)
 

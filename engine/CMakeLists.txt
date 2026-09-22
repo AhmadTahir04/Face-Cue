@@ -44,6 +44,19 @@ target_link_libraries(ffa PRIVATE ffacore)
 add_executable(ffa_eval src/eval.cpp)
 target_link_libraries(ffa_eval PRIVATE ffacore)
 
+# --- local HTTP server (for the React UI) ---
+find_package(httplib QUIET)
+find_package(nlohmann_json QUIET)
+find_package(Threads REQUIRED)
+if(httplib_FOUND AND nlohmann_json_FOUND)
+    add_executable(ffa_server src/server.cpp)
+    target_link_libraries(ffa_server PRIVATE
+        ffacore httplib::httplib nlohmann_json::nlohmann_json Threads::Threads)
+else()
+    message(STATUS "cpp-httplib / nlohmann-json not found — skipping ffa_server. "
+                   "`brew install cpp-httplib nlohmann-json`")
+endif()
+
 # --- unit tests (safety logic; no ML model needed) ---
 enable_testing()
 find_package(GTest)

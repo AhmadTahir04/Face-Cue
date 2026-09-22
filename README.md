@@ -13,18 +13,25 @@ people with prosopagnosia (face blindness).
 > plain-English guide to the whole project: every technology, every file, how the
 > AI works, how to inspect the data, and interview prep.
 
-## Status: Milestones 1–3 complete (engine done, tuned, tested)
+## Status: Milestones 1–4 built (engine tuned + tested; web UI done)
 
-A C++ command-line tool that enrolls a person (webcam or image folder) and, in a
-live "watch" mode, announces an enrolled person or stays silent for an unknown
-face. The safety logic is unit-tested and the thresholds are tuned on a public
-benchmark (0 false matches over 1642 stranger tests — see
-[docs/EVALUATION.md](docs/EVALUATION.md)). The polished React UI and localhost
-API come next (Milestone 4).
+A tuned, unit-tested C++ recognition engine (0 false matches over 1642 stranger
+tests — see [docs/EVALUATION.md](docs/EVALUATION.md)) with **two front-ends**: a
+command-line tool and a **local web app** (C++ HTTP server on `127.0.0.1` +
+React/TypeScript UI) for enrolling, hands-free watching, and managing people.
 
-> One manual step remains for the maintainer: run `enroll`/`watch` once on the
-> Mac to grant camera access and confirm live recognition (the automated tests
-> and evaluation cover everything that can run without a physical camera).
+> One manual step remains for the maintainer: run it once on the Mac to grant
+> camera access and confirm live recognition (automated tests + evaluation cover
+> everything that runs without a physical camera).
+
+## Run the web app (easiest)
+
+```bash
+./scripts/run.sh
+```
+
+Then open **http://127.0.0.1:8765** in a browser. Grant camera access when macOS
+asks. Enroll a few people, then press **Start watching**.
 
 ## Architecture (short version)
 
