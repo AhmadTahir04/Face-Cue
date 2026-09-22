@@ -65,7 +65,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Familiar Face Assistant</h1>
+        <h1>Face Cue</h1>
         <div className="topbar-right">
           <span className={"cam-dot " + (status?.cameraOpen ? "on" : "off")}>
             {status?.cameraOpen ? "● camera on" : "○ camera off"}

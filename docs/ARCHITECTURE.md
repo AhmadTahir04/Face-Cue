@@ -1,6 +1,6 @@
 # Architecture
 
-Familiar Face Assistant is a **local-only** app that helps a user recognize people
+Face Cue is a **local-only** app that helps a user recognize people
 who have consented to be enrolled. It never contacts a network at runtime.
 
 ## High-level shape

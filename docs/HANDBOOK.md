@@ -1,4 +1,4 @@
-# Project Handbook — Familiar Face Assistant
+# Project Handbook — Face Cue
 
 > **Read this to understand the whole project.** It is written for someone who
 > does not already know these technologies. It goes from "what is this" down to

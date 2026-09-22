@@ -1,4 +1,4 @@
-// Familiar Face Assistant — Milestone 1 command-line prototype.
+// Face Cue — Milestone 1 command-line prototype.
 //
 // Subcommands:
 //   ffa enroll "Name" [--reminder "cousin"] [--shots N]   capture & store a person
@@ -31,7 +31,7 @@ namespace {
 
 void usage() {
     std::cout <<
-        "Familiar Face Assistant (local-only prototype)\n"
+        "Face Cue (local-only prototype)\n"
         "Usage:\n"
         "  ffa enroll \"Name\" [--reminder \"cousin\"] [--shots N]   webcam enroll\n"
         "  ffa enroll-dir \"Name\" <folder> [--reminder \"cousin\"]  enroll from images\n"

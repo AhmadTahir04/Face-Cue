@@ -373,7 +373,7 @@ int main(int argc, char** argv) {
     if (!svr.set_mount_point("/", "../../ui/dist"))
         std::cout << "(UI not built yet; run `npm run build` in ui/. API still works.)\n";
 
-    std::cout << "Familiar Face Assistant server on http://127.0.0.1:" << port << "\n"
+    std::cout << "Face Cue server on http://127.0.0.1:" << port << "\n"
               << "Open the UI in a browser. Ctrl-C to stop.\n";
     svr.listen("127.0.0.1", port);
 

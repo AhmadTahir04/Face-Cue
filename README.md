@@ -1,4 +1,4 @@
-# Familiar Face Assistant
+# Face Cue
 
 A **private, local-only** assistant that helps a user recognize people they
 already know and who have **consented** to be enrolled — built as an aid for
@@ -118,9 +118,9 @@ sanity check — tuning on your own enrolled group is still recommended.
 ## Tuning & honesty
 
 Thresholds live in [engine/include/ffa/config.hpp](engine/include/ffa/config.hpp)
-and are **uncalibrated starting values**. They will be tuned and measured in the
-Evaluation milestone. A similarity score is **not** a probability and is never
-shown as a confidence percentage.
+and were **tuned on a public benchmark** (see [docs/EVALUATION.md](docs/EVALUATION.md));
+re-tuning on your own enrolled group is recommended for real use. A similarity
+score is **not** a probability and is never shown as a confidence percentage.
 
 ## Privacy
 
