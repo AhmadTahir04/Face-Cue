@@ -12,6 +12,9 @@ struct Config {
     std::string detectorModel   = "../models/face_detection_yunet_2023mar.onnx";
     std::string recognizerModel = "../models/face_recognition_sface_2021dec.onnx";
 
+    // --- camera ---
+    int cameraIndex = 0;  // which webcam (0 = default; try 1, 2 if the wrong one opens)
+
     // --- storage ---
     std::string dbPath = "../../data/faces.db";  // repo-root/data, from engine/build
 

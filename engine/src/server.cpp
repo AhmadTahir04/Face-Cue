@@ -105,7 +105,7 @@ void cameraLoop(std::atomic<bool>& running, Config cfg) {
     std::unordered_map<int64_t, std::chrono::steady_clock::time_point> lastAnnounce;
     Mode lastMode = Mode::Idle;
 
-    Camera cam(0);
+    Camera cam(cfg.cameraIndex);
     { std::lock_guard<std::mutex> lk(g.m); g.cameraOpen = cam.isOpen(); }
 
     cv::Mat frame;
@@ -114,7 +114,7 @@ void cameraLoop(std::atomic<bool>& running, Config cfg) {
             { std::lock_guard<std::mutex> lk(g.m);
               g.cameraOpen = false; g.jpeg = placeholder("Camera unavailable"); }
             std::this_thread::sleep_for(500ms);
-            cam = Camera(0);  // retry
+            cam = Camera(cfg.cameraIndex);  // retry
             { std::lock_guard<std::mutex> lk(g.m); g.cameraOpen = cam.isOpen(); }
             continue;
         }
@@ -237,14 +237,17 @@ json peopleJson(Storage& store) {
 int main(int argc, char** argv) {
     Config cfg;
     int port = 8765;
-    for (int i = 1; i + 1 < argc; ++i)
-        if (std::string(argv[i]) == "--port") port = std::stoi(argv[i + 1]);
+    for (int i = 1; i + 1 < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "--port")   port = std::stoi(argv[i + 1]);
+        if (a == "--camera") cfg.cameraIndex = std::stoi(argv[i + 1]);
+    }
 
     // macOS: the camera authorization request must originate from the main
     // thread (AVFoundation main run loop). Briefly open/release the device here
     // so the permission prompt appears correctly on first run; the background
     // thread then owns the camera for real once access is granted.
-    { cv::VideoCapture prime(0); if (prime.isOpened()) prime.release(); }
+    { cv::VideoCapture prime(cfg.cameraIndex); if (prime.isOpened()) prime.release(); }
 
     std::atomic<bool> running{true};
     std::thread camThread(cameraLoop, std::ref(running), cfg);
