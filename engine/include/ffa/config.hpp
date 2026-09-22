@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 
 namespace ffa {
 
@@ -19,9 +20,13 @@ struct Config {
     std::string dbPath = "../../data/faces.db";  // repo-root/data, from engine/build
 
     // --- detector (YuNet) ---
-    float detScoreThreshold = 0.90f;  // minimum detector confidence to consider a face
+    float detScoreThreshold = 0.70f;  // minimum detector confidence to consider a face
+                                      // (lower = catches more angled/harder faces)
     float nmsThreshold      = 0.30f;
     int   topK              = 50;
+    // If no upright face is found, rotate the frame by these degrees and retry,
+    // so a tilted/crooked face is still detected. Empty = disable.
+    std::vector<int> tiltAngles = {18, -18, 35, -35};
 
     // --- quality gate (reject bad crops before matching) ---
     int    minFacePx   = 80;     // reject faces smaller than this (min of w,h), px

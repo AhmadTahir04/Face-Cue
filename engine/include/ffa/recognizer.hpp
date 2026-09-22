@@ -29,9 +29,13 @@ public:
     double cosine(const cv::Mat& a, const cv::Mat& b);
 
 private:
+    // Single-pass detection on the frame as-is (no rotation).
+    std::vector<DetectedFace> detectRaw(const cv::Mat& frameBGR);
+
     cv::Ptr<cv::FaceDetectorYN>   detector_;
     cv::Ptr<cv::FaceRecognizerSF> recognizer_;
     cv::Size lastInputSize_{0, 0};
+    std::vector<int> tiltAngles_;
 };
 
 }  // namespace ffa
