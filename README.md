@@ -9,6 +9,10 @@ people with prosopagnosia (face blindness).
 > it is designed to stay silent rather than guess a wrong name.
 > See [docs/PRIVACY.md](docs/PRIVACY.md).
 
+> 📘 **New here? Read [docs/HANDBOOK.md](docs/HANDBOOK.md)** — a from-scratch,
+> plain-English guide to the whole project: every technology, every file, how the
+> AI works, how to inspect the data, and interview prep.
+
 ## Status: Milestones 1–3 complete (engine done, tuned, tested)
 
 A C++ command-line tool that enrolls a person (webcam or image folder) and, in a
