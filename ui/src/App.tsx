@@ -10,6 +10,10 @@ export default function App() {
   const [people, setPeople] = useState<Person[]>([]);
   const lastAnnounce = useRef<number>(0);
   const initialized = useRef(false);
+  // Bumped when the camera transitions offline -> online, to force the MJPEG
+  // <img> to reconnect (e.g. after the server restarts).
+  const [streamNonce, setStreamNonce] = useState(1);
+  const prevCameraOpen = useRef(false);
 
   const refreshPeople = useCallback(() => {
     api.people().then(setPeople).catch(() => {});
@@ -26,6 +30,13 @@ export default function App() {
   }, []);
 
   useEffect(refreshPeople, [refreshPeople]);
+
+  // Reconnect the video stream when the camera comes online.
+  useEffect(() => {
+    const open = !!status?.cameraOpen;
+    if (open && !prevCameraOpen.current) setStreamNonce((n) => n + 1);
+    prevCameraOpen.current = open;
+  }, [status?.cameraOpen]);
 
   // Speak a new announcement via the browser (Web Speech API).
   useEffect(() => {
@@ -67,7 +78,7 @@ export default function App() {
 
       <main className="layout">
         <section className="left">
-          <Preview cameraOpen={!!status?.cameraOpen} />
+          <Preview cameraOpen={!!status?.cameraOpen} streamNonce={streamNonce} />
         </section>
 
         <section className="right">

@@ -1,15 +1,24 @@
-// Live camera preview. The C++ server streams an annotated MJPEG; we just show
-// it in an <img>. The stream URL is loaded once so the browser keeps the
-// long-lived multipart connection open.
+// Live camera preview. The C++ server streams an annotated MJPEG; we show it in
+// an <img>. `streamNonce` changes whenever the camera comes (back) online, which
+// remounts the <img> so it reconnects to the fresh stream — e.g. after the
+// server restarts, without needing a manual page reload.
 
-export default function Preview({ cameraOpen }: { cameraOpen: boolean }) {
+export default function Preview({
+  cameraOpen, streamNonce,
+}: { cameraOpen: boolean; streamNonce: number }) {
   return (
     <div className="preview">
-      <img className="preview-img" src="/stream.mjpg" alt="camera preview" />
+      <img
+        key={streamNonce}
+        className="preview-img"
+        src={`/stream.mjpg?n=${streamNonce}`}
+        alt="camera preview"
+      />
       {!cameraOpen && (
         <div className="preview-warn">
-          Camera not available. Grant camera access to your terminal/app and make
-          sure no other app is using the webcam.
+          Camera not available. Grant camera access to Terminal, disable your
+          iPhone's Continuity Camera if it grabbed the wrong device, and make sure
+          no other app is using the webcam.
         </div>
       )}
     </div>
